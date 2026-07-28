@@ -1,7 +1,7 @@
 #algorithms  , input proccess , data will be here. 
 from collections import deque , defaultdict
 from math import inf
-data =  open("/media/alireza/Local Disk/ALIREZA/VS CODE/Social media project with Graph(data structure course)/data.txt")
+data =  open("/media/alireza/Local Disk/ALIREZA/VS CODE/Social media project with Graph(data structure course)/data1.txt")
 
 class node: 
     def __init__(self, name):
@@ -17,6 +17,8 @@ class node:
 
     def __hash__(self):
         return hash(self.name)
+    def __iter__(self):
+        return 
 
 
 groups = []  #groups list declaration
@@ -31,7 +33,8 @@ def txtproccess(txt):  #proccess the input text file
         k = node(k)
         v = node(v)
         if v in g[k] :
-            e -= 1
+            continue
+            
         g[k].add(v)
         g[v].add(k)
         e += 1
@@ -107,19 +110,21 @@ class Proccess():  #interface of main.py
         friends = set()
         for neighbor in self.g[start]:
             for friend in self.g[neighbor]:
+                if friend == start or friend in self.g[start]:
+                    continue
                 friends.add(friend)
         return friends
     def popular_person(self): # person with largest community and friends
-        person = []
+        self.pperson = []
         mx = 0
         for p in self.g.keys():
             ln = len(self.g[p])
             if mx < ln:
-                person.append(p)
+                self.pperson.append(p)
                 mx = len(self.g[p])
             elif mx == ln:
-                person.append(p)
-        return person
+                self.pperson.append(p)
+        return self.pperson
     def intersecion(self , u:node , v:node): # friends of tow person
         return self.g[u].intersection(self.g[v])
     def path(self , start:node , stop:node):
@@ -137,7 +142,8 @@ class Proccess():  #interface of main.py
                 mx = ln
         return ( lnn , self.e , lnn/self.e , biggest_group , self.popular_person() ) #8.a , 8.b , 8.c , 8.d , 8.e
     def BFS(self , start:node): # distance and list nodes from start node
-        return BFS(self.g , start)
+        self.bf = BFS(self.g , start)
+        return self.bf
 
     
 
@@ -145,12 +151,3 @@ class Proccess():  #interface of main.py
 
             
 
-
-social = Proccess(data)
-print("___________BFS__________", social.BFS(node("F3")))
-print("___________group__________", social.group())
-print("___________find_friend__________", social.find_friend(node("F3")))
-print("___________popular_person__________", social.popular_person())
-print("___________intersecion__________", social.intersecion(node("G2") , node("F3")))
-print("___________path__________", social.path(node("G2") , node("F3")))
-print("___________network__________", social.network())
