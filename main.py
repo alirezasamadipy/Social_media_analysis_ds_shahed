@@ -144,10 +144,3 @@ class Proccess():  #interface of main.py
     def BFS(self , start:node): # distance and list nodes from start node
         self.bf = BFS(self.g , start)
         return self.bf
-
-    
-
-
-
-            
-
