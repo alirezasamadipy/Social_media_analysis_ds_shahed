@@ -1,7 +1,7 @@
 #algorithms  , input proccess , data will be here. 
 from collections import deque , defaultdict
 from math import inf
-data =  open("/media/alireza/Local Disk/ALIREZA/VS CODE/Social media project with Graph(data structure course)/data1.txt")
+from json_manager import JSONManager
 
 class node: 
     def __init__(self, name):
@@ -23,22 +23,28 @@ class node:
 
 groups = []  #groups list declaration
 
-
+nodes_cache = {}
 
 def txtproccess(txt):  #proccess the input text file
     e = 0  #number of edges
     g = defaultdict(set)  #graph network declaration
+    global nodes_cache
+    
+    def get_or_create_node(name):
+        if name not in nodes_cache:
+            nodes_cache[name] = node(name)
+        return nodes_cache[name]
     for line in txt:
         k,v =line[:-2].split()
-        k = node(k)
-        v = node(v)
+        k = get_or_create_node(k)
+        v = get_or_create_node(v)
         if v in g[k] :
             continue
             
         g[k].add(v)
         g[v].add(k)
         e += 1
-    return (g , e)
+    return (g , e , nodes_cache)
     
 
 
@@ -97,10 +103,17 @@ def BFS(g:defaultdict,start:node , stop = node("not set"),grouping = False):
 
 
 class Proccess():  #interface of main.py
-    def __init__(self , input_txt):
-        self.gg = None
-        self.g , self.e = txtproccess(input_txt)
-    def group(self): #grouping the network
+    def __init__(self , input , js = False):
+        global nodes_cache
+        if js:
+            self.g = input["graph"]
+            self.e = input["#_of_edges"]
+            self.nodes_cache = nodes_cache
+            self.gg = input["groups"]
+        else:
+            self.g , self.e , self.nodes_cache = txtproccess(input)
+        self.gg = self._group()
+    def _group(self): #grouping the network
         global groups
         groups.clear()
         groups.append(BFS(self.g , next(iter(self.g)) , grouping=True))
@@ -120,6 +133,7 @@ class Proccess():  #interface of main.py
         for p in self.g.keys():
             ln = len(self.g[p])
             if mx < ln:
+                self.pperson.clear()
                 self.pperson.append(p)
                 mx = len(self.g[p])
             elif mx == ln:
@@ -131,8 +145,6 @@ class Proccess():  #interface of main.py
         return shortest_path(self.g , start , stop) #shortest path from b to a
     def network(self):  # network data
         lnn = len(self.g.keys())
-        if self.gg == None:
-            self.group()
         biggest_group = set()
         mx = 0
         for p in range(len(self.gg)):
@@ -140,7 +152,67 @@ class Proccess():  #interface of main.py
             if mx < ln:
                 biggest_group = self.gg[p]
                 mx = ln
-        return ( lnn , self.e , lnn/self.e , biggest_group , self.popular_person() ) #8.a , 8.b , 8.c , 8.d , 8.e
+        return ( lnn , self.e , (2*(self.e))/lnn , biggest_group , self.popular_person() ) #8.a , 8.b , 8.c , 8.d , 8.e
     def BFS(self , start:node): # distance and list nodes from start node
         self.bf = BFS(self.g , start)
         return self.bf
+    
+    def add_user(self , nu):
+        if nu not in self.g:
+            self.g[nu] = set()
+            s = set()
+            s.add(nu)
+            self.gg.append(s)
+            return True
+        return False
+        
+        
+    def remove_user(self , ou):
+        if ou in self.g:
+            for friends in self.g[ou]:
+                self.g[friends].remove(ou)
+            del self.g[ou]#######
+            for i in range(len(self.gg)):
+                if ou in self.gg[i]:
+                    self.gg[i].remove(ou)
+                    if len(self.gg[i]) == 0:self.gg.pop(i)
+                    break
+            return True
+        return False
+    def add_edge(self , a , b):
+        if a in self.g and b in self.g:
+            disj = True
+            for i in range(len(self.gg)):
+                if a in self.gg[i] and b in self.gg[i]:
+                    disj = False
+            self.g[a].add(b)
+            self.g[b].add(a)
+            if disj:
+                new_group = set()
+                for i in range(len(self.gg)):
+                    if a in self.gg[i]:
+                        new_group = new_group.union(self.gg[i])
+                        ai= i
+                    if b in self.gg[i]:
+                        new_group = new_group.union(self.gg[i])
+                        bi = i
+                if ai > bi:
+                    del self.gg[ai]
+                    del self.gg[bi]
+                else:
+                    del self.gg[bi]
+                    del self.gg[ai]
+                print("SELF.gg",self.gg)
+                self.gg.append(new_group)
+            self.e +=1
+            return True
+        return False
+
+    def remove_edge(self , a , b):
+        if a in self.g[b] and b in self.g[a]:
+            self.g[a].remove(b)
+            self.g[b].remove(a)
+            self._group()
+            self.e -=1
+            return True
+        return False

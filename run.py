@@ -1,11 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import json
-from main import Proccess , node
-
-# assume your Proccess class is already imported here
-# from your_module import Proccess, node
-
+from main import Proccess , node , nodes_cache
+from json_manager import JSONManager
 
 class SocialGUI(tk.Tk):
     def __init__(self):
@@ -16,15 +13,16 @@ class SocialGUI(tk.Tk):
 
         self.proc = None
         self.file_path = None
-
+        self.json_mgr = JSONManager()
         self._build_ui()
 
     def _build_ui(self):
         # top bar
         top = ttk.Frame(self, padding=10)
         top.pack(fill="x")
-
-        ttk.Button(top, text="Open TXT", command=self.load_file).pack(side="left", padx=5)
+        ttk.Button(top, text="Save JSON", command=self.save_json).pack(side="left", padx=5)
+        ttk.Button(top, text="Load JSON", command=self.load_json).pack(side="left", padx=5)
+        ttk.Button(top, text="Open TXT", command=self.load_text).pack(side="left", padx=5)
         self.file_label = ttk.Label(top, text="No file loaded")
         self.file_label.pack(side="left", padx=10)
 
@@ -42,7 +40,8 @@ class SocialGUI(tk.Tk):
             "Popular Person",
             "Intersection",
             "Network Data",
-            "BFS"
+            "BFS",
+            "Edit Network"
         ]:
             frame = ttk.Frame(self.nb, padding=10)
             self.nb.add(frame, text=name)
@@ -57,8 +56,46 @@ class SocialGUI(tk.Tk):
         self._intersection_tab()
         self._network_tab()
         self._bfs_tab()
+        self._edit_network_tab()
+    def save_json(self):
+        dlist = {"graph":{} , "groups":[]}
+        try:
+            for user in self.proc.g:
+                dlist["graph"][user.name] = [x.name for x in  self.proc.g[user]]
+            dlist["#_of_edges"] = self.proc.e
+            for i in range(len(self.proc.gg)):
+                dlist["groups"] = [x.name for x in self.proc.gg[i]]
+            self.json_mgr.save_data(dlist)
+            dlist.clear()
+            self.file_label.config(text="JSON Saved")
+        except:messagebox.showwarning("Empty", "No data exists.")
+        del dlist
 
-    def load_file(self):
+    def load_json(self):
+        jn = self.json_mgr.load_data()
+        if not jn.get("graph"):
+            messagebox.showwarning("Empty", "JSON file is empty.")
+            return
+        dset = {"graph":{} , "groups":[]}
+
+        for user in jn["graph"].keys():
+            s = set()
+            for x in jn["graph"][user]:
+                s.add(self.get_or_create_node(x))
+            dset["graph"][self.get_or_create_node(user)] = s
+        dset["#_of_edges"] = jn["#_of_edges"]
+        for gr in jn["groups"]:
+            s = set()
+            for i in range(len(gr)):
+                s.add(self.get_or_create_node(gr[i]))
+            dset["groups"].append(s)
+        self.proc = Proccess(dset , js=True)
+        del dset
+        self.file_label.config(text="Loaded from JSON")
+        self.clear_all_outputs()
+        messagebox.showinfo("Loaded", f"JSON loaded successfully with {len(jn['graph'])} users.")
+        del jn
+    def load_text(self):
         path = filedialog.askopenfilename(
             title="Select text file",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
@@ -75,7 +112,6 @@ class SocialGUI(tk.Tk):
             messagebox.showinfo("Loaded", "File loaded and processed successfully.")
         except Exception as e:
             messagebox.showerror("Error", str(e))
-
     def clear_all_outputs(self):
         for var in [
             getattr(self, "friends_out", None),
@@ -113,8 +149,15 @@ class SocialGUI(tk.Tk):
             return False
         return True
 
-    def node_from_name(self, name):
-        return node(name.strip())
+    def get_or_create_node(self  , name):
+        try:
+            if name not in self.proc.nodes_cache:
+                self.proc.nodes_cache[name] = node(name)
+            return self.proc.nodes_cache[name]
+        except:
+            if name not in nodes_cache:
+                nodes_cache[name] = node(name)
+            return nodes_cache[name]
 
     def write_output(self, widget, text):
         widget.config(state="normal")
@@ -135,7 +178,7 @@ class SocialGUI(tk.Tk):
     def show_friends(self):
         if not self.ensure_proc():
             return
-        u = self.node_from_name(self.friends_name.get())
+        u = self.get_or_create_node(self.friends_name.get())
         if u not in self.proc.g:
             messagebox.showerror("Error", "User not found.")
             return
@@ -156,15 +199,16 @@ class SocialGUI(tk.Tk):
     def check_group(self):
         if not self.ensure_proc():
             return
-        a = self.node_from_name(self.grp_a.get())
-        b = self.node_from_name(self.grp_b.get())
-        groups = self.proc.group()
-
+        a = self.get_or_create_node(self.grp_a.get())
+        b = self.get_or_create_node(self.grp_b.get())
         found = False
-        for g in groups:
-            if a in g and b in g:
-                found = True
-                break
+        if a not in self.proc.g or b not in self.proc.g:
+            messagebox.showerror("Error", "User not found.")
+        else:
+            for g in self.proc.gg:
+                if a in g and b in g:
+                    found = True
+                    break
 
         self.write_output(self.group_out, str(found))
 
@@ -181,8 +225,11 @@ class SocialGUI(tk.Tk):
     def show_path(self):
         if not self.ensure_proc():
             return
-        a = self.node_from_name(self.sp_a.get())
-        b = self.node_from_name(self.sp_b.get())
+        a = self.get_or_create_node(self.sp_a.get())
+        b = self.get_or_create_node(self.sp_b.get())
+        if a not in self.proc.g or b not in self.proc.g:
+            messagebox.showerror("Error", "User not found.")
+            return
         try:
             path = self.proc.path(a, b)
             names = [x.name for x in reversed(path)]
@@ -203,7 +250,7 @@ class SocialGUI(tk.Tk):
     def show_suggestions(self):
         if not self.ensure_proc():
             return
-        u = self.node_from_name(self.sug_name.get())
+        u = self.get_or_create_node(self.sug_name.get())
         if u not in self.proc.g:
             messagebox.showerror("Error", "User not found.")
             return
@@ -244,17 +291,15 @@ class SocialGUI(tk.Tk):
     def show_groups(self):
         if not self.ensure_proc():
             return
-        groups = self.proc.group()
         lines = []
-        for i, g in enumerate(groups, 1):
+        print(self.proc.gg)########
+        for i, g in enumerate(self.proc.gg, 1):
             lines.append(f"Group {i}: " + ", ".join(sorted([x.name for x in g])))
         self.write_output(self.groups_out, "\n".join(lines))
 
     def draw_groups(self):
         if not self.ensure_proc():
             return
-
-        groups = self.proc.group()
         self.group_canvas.delete("all")
 
         colors = ["#ff9999", "#99ccff", "#99ff99", "#ffcc99", "#cc99ff", "#ffff99"]
@@ -268,7 +313,7 @@ class SocialGUI(tk.Tk):
         group_y = 40
         col_width = 260
 
-        for gi, g in enumerate(groups):
+        for gi, g in enumerate(self.proc.gg):
             g = list(g)
             color = colors[gi % len(colors)]
 
@@ -326,8 +371,8 @@ class SocialGUI(tk.Tk):
     def show_intersection(self):
         if not self.ensure_proc():
             return
-        a = self.node_from_name(self.int_a.get())
-        b = self.node_from_name(self.int_b.get())
+        a = self.get_or_create_node(self.int_a.get())
+        b = self.get_or_create_node(self.int_b.get())
         if a not in self.proc.g or b not in self.proc.g:
             messagebox.showerror("Error", "User not found.")
             return
@@ -372,12 +417,13 @@ class SocialGUI(tk.Tk):
 
         lnn, e, ratio, biggest_group, popular = self.proc.network()
         export_data = {
-            "nodes": lnn,
-            "edges": e,
+            "#_of_nodes": lnn,
+            "#_of_edges": e,
             "ratio": ratio,
             "biggest_group": [x.name for x in biggest_group],
             "popular_person": [x.name for x in popular]
         }
+        export_data = self.json_mgr.load_data() | export_data
         with open(path, "w") as f:
             json.dump(export_data, f, indent=4)
 
@@ -397,7 +443,7 @@ class SocialGUI(tk.Tk):
         if not self.ensure_proc():
             return
 
-        s = self.node_from_name(self.bfs_name.get())
+        s = self.get_or_create_node(self.bfs_name.get())
         if s not in self.proc.g:
             messagebox.showerror("Error", "User not found.")
             return
@@ -412,6 +458,57 @@ class SocialGUI(tk.Tk):
             lines.append("")
 
         self.write_output(self.bfs_out, "\n".join(lines))
+
+    def add_user_action(self):
+        u = node(self.edit_user_entry.get().strip())
+        if self.proc.add_user(u):
+            messagebox.showinfo("Success", f"User '{u}' added.")
+        else:
+            messagebox.showwarning("Warning", "User exists or name is empty.")
+
+    def remove_user_action(self):
+        u = node(self.edit_user_entry.get().strip())
+        if self.proc.remove_user(u):
+            messagebox.showinfo("Success", f"User '{u}' removed.")
+        else:
+            messagebox.showwarning("Warning", "User not found.")
+
+    def add_conn_action(self):
+        a = node(self.conn_a.get().strip())
+        b = node(self.conn_b.get().strip())
+        if self.proc.add_edge(a, b):
+            messagebox.showinfo("Success", f"Connection '{a} - {b}' added.")
+        else:
+            messagebox.showwarning("Warning", "Check if users exist.")
+
+    def remove_conn_action(self):
+        a = node(self.conn_a.get().strip())
+        b = node(self.conn_b.get().strip())
+        if self.proc.remove_edge(a, b):
+            messagebox.showinfo("Success", f"Connection '{a} - {b}' removed.")
+        else:
+            messagebox.showwarning("Warning", "Connection not found.")
+
+    def _edit_network_tab(self):
+        frame = self.tabs["Edit Network"]
+        _, entries1 = self.make_entry_row(frame, ["User Name:"])
+        self.edit_user_entry = entries1[0]
+        
+        btn_frame1 = ttk.Frame(frame)
+        btn_frame1.pack(fill="x", pady=5)
+        ttk.Button(btn_frame1, text="Add User", command=self.add_user_action).pack(side="left", padx=5)
+        ttk.Button(btn_frame1, text="Remove User", command=self.remove_user_action).pack(side="left", padx=5)
+
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=10)
+
+        _, entries2 = self.make_entry_row(frame, ["User A:", "User B:"])
+        self.conn_a, self.conn_b = entries2
+
+        btn_frame2 = ttk.Frame(frame)
+        btn_frame2.pack(fill="x", pady=5)
+        ttk.Button(btn_frame2, text="Add Connection", command=self.add_conn_action).pack(side="left", padx=5)
+        ttk.Button(btn_frame2, text="Remove Connection", command=self.remove_conn_action).pack(side="left", padx=5)
+
 
 
 if __name__ == "__main__":
