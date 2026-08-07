@@ -172,11 +172,7 @@ class Proccess():  #interface of main.py
             for friends in self.g[ou]:
                 self.g[friends].remove(ou)
             del self.g[ou]#######
-            for i in range(len(self.gg)):
-                if ou in self.gg[i]:
-                    self.gg[i].remove(ou)
-                    if len(self.gg[i]) == 0:self.gg.pop(i)
-                    break
+            self._group()
             return True
         return False
     def add_edge(self , a , b):
