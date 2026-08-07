@@ -169,6 +169,7 @@ class Proccess():  #interface of main.py
         
     def remove_user(self , ou):
         if ou in self.g:
+            self.e = self.e - len(self.g[ou])
             for friends in self.g[ou]:
                 self.g[friends].remove(ou)
             del self.g[ou]#######
