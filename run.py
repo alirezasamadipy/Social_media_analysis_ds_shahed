@@ -230,10 +230,18 @@ class SocialGUI(tk.Tk):
         if a not in self.proc.g or b not in self.proc.g:
             messagebox.showerror("Error", "User not found.")
             return
+        np = True
+        for g in self.proc.gg:
+                if a in g and b in g:
+                    np = False
+                    break
         try:
-            path = self.proc.path(a, b)
-            names = [x.name for x in reversed(path)]
-            self.write_output(self.path_out, " -> ".join(names))
+            if np:
+                self.write_output(self.path_out, "Infinite")
+            else:
+                path = self.proc.path(a, b)
+                names = [x.name for x in reversed(path)]
+                self.write_output(self.path_out, " -> ".join(names))
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
