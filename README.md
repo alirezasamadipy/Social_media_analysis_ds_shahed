@@ -59,7 +59,7 @@ time complexity:O(1)<br>
 space complexity:O(1)<br>
 
 # Remove user
-time complexity:O(#_of_friends) or O(#_of_groups)<br>
+time complexity:O(V + E)<br>
 space complexity:O(1)<br>
 
 # Add edge
